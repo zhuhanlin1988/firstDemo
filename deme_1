@@ -1,0 +1,214 @@
+<template>
+	<div class="data-content">
+		<div class="block">
+			<div class="select_box">
+				<el-input class="imput_width" placeholder="请输入监督员名字" size="medium" v-model="checkerName"></el-input>
+				<!--<el-input v-if="listInfo.roleTypeId!=3"  class="imput_width" placeholder="请输入项目名称" size="medium" v-model="projectName"></el-input>-->
+				<el-date-picker class="imput_width" v-model="createTime1" type="date" placeholder="时间筛选" format="yyyy 年 MM 月 dd 日" value-format="yyyy-MM-dd" size="medium">
+				</el-date-picker>
+				<el-button type="primary" size="medium" @click="search">查询</el-button>
+				
+				<el-button type="primary" size="medium" @click="refresh">刷新</el-button>
+			</div>
+			<div class="table_box">
+				<el-table :data="tableData" border style="width: 100%" size="small">
+					<el-table-column type="index" label="序号" width="100" align="center">
+					</el-table-column>
+					<el-table-column prop="number" label="整改单号"  align="center">
+					</el-table-column>
+					<el-table-column prop="checkerName" label="监督员"  align="center">
+					</el-table-column>
+					<el-table-column prop="projectName" label="项目名称"  align="center">
+					</el-table-column>
+					<el-table-column prop="createTime" label="发起时间"  align="center" :formatter="dateFormat">
+					</el-table-column>
+					<!--<el-table-column prop="address" label="操作" align="center">
+						<template slot-scope="scope">
+							<!--<router-link :to="{path: 'projectDetail', query:{id:scope.row.id}}">
+							<router-link :to="{path: 'supLawListOneCheckList', query:{listId:scope.row.id,number:scope.row.number,limit:scope.row.limit} }">
+								<el-button type="text" size="small" style="color: #333333;" icon="el-icon-document">详情 &nbsp;&nbsp;</el-button>
+							</router-link>
+							<el-button @click="deleteRow(scope.row)" type="text" style="color: red;" size="small" icon="el-icon-delete">删除 </el-button>
+							<router-link :to="{path: 'printInspectionNotice', query:{listId:scope.row.id,projectId:scope.row.projectId,projectName:scope.row.projectName,number:scope.row.number,} }">
+								<el-button size="mini" type="primary" plain>整改通知书打印</el-button>
+							</router-link>
+						</template>
+					</el-table-column>-->
+				</el-table>
+			</div>
+			<div class="page_box">
+				<el-pagination @size-change="handleSizeChange" @current-change="handleCurrentChange" :current-page.sync="page.pageNum" :page-sizes="[10, 20, 30, 40]" :page-size="page.pageSize" layout="sizes, prev, pager, next" :total="page.total">
+				</el-pagination>
+			</div>
+		</div>
+		<!--弹窗-->
+		<el-dialog title="删除" :visible.sync="dialogDelete" width="30%" class="dialog">
+			<span>真的要删除这条记录？
+ 			</span>
+			<div slot="footer" class="dialog-footer">
+				<el-button type="primary" @click="deleteUserDialog">确 定</el-button>
+				<el-button @click="dialogDelete = false">取 消</el-button>
+			</div>
+		</el-dialog>
+	</div>
+</template>
+
+<script>
+	import moment from 'moment'
+	export default {
+//		props:["projectName1"],
+		data() {
+			return {
+				listInfo:JSON.parse(localStorage.getItem('loginData')),
+				tableData: [],
+				checkerName: '',
+				projectName: '',
+				createTime1: '',
+				deleteOrEiteId: '',
+				page: {
+					pageNum: 1,
+					pageSize: 10,
+					total: 0
+				},
+				dialogDelete: false,
+				currentPage: 1,
+			}
+		},
+		mounted() {
+			this.loadList();
+			let projectName=this.$route.query.projectName;
+      		console.log(projectName);
+		},
+		//列表加载
+		methods: {
+			loadList() {
+				let param = {
+					checkerName: this.checkerName,
+					projectName: this.projectName,
+					createTime: this.createTime1,
+					pageNum: this.page.pageNum,
+					pageSize: this.page.pageSize,
+				};
+				//如果是企业账号登录，多加一个companyId查询的条件（只能看到自己企业的整改单）
+				if(this.listInfo.roleTypeId==3){
+					param.companyId=this.listInfo.deptId;
+				};
+				param.projectName=this.$route.query.projectName;
+				let url = serverUrl + '/inspect/list/pageList';
+				this.$http.get(url, {
+					params: param
+				}).then(res => {
+					if(res.data.result) {
+						this.tableData = res.data.data.list;
+						this.page.total = res.data.data.total; 
+					}
+				});
+			},
+			//时间格式化
+			dateFormat(row, column) {
+				var date = row[column.property];
+				if(date == undefined) {
+					return "";
+				}
+				return moment(date).format("YYYY-MM-DD HH:mm:ss");
+			},
+			//页容量
+			handleSizeChange(data) {
+				this.page.pageSize = data;
+				this.page.pageNum = 1;
+				this.loadList();
+			},
+			//翻页
+			handleCurrentChange(data) {
+				this.page.pageNum = data;
+				this.loadList();
+			},
+			//条件查询
+			search() {
+				this.page.pageNum = 1;
+				this.loadList();
+			},
+			//刷新输入框
+			refresh() {
+				this.page.pageNum = 1;
+				this.checkerName = '',
+					this.projectName = '',
+					this.createTime1 = '',
+					this.loadList();
+			},
+			//删除点击弹窗
+			deleteRow(row) {
+				this.dialogDelete = true;
+				this.deleteOrEiteId = row.id;
+			},
+			//调用删除接口
+			deleteUserDialog() {
+				let url = serverUrl + '/inspect/list/delete';
+				this.$http.get(url, {
+					params: {
+						id: this.deleteOrEiteId
+					}
+				}).then((res) => {
+					if(res.data.result == true) {
+						this.$message({
+							message: res.data.message,
+							type: 'success'
+						});
+						this.dialogDelete = false;
+						this.loadList();
+					} else {
+						this.$message({
+							message: res.data.message,
+							type: 'error'
+						});
+					}
+				});
+			}
+
+		}
+	}
+</script>
+
+<style scoped="scoped">
+	.block {
+		min-height: 600px;
+	}
+	
+	.select_box {
+		margin: 5px 20px;
+	}
+	
+	.imput_width {
+		width: 206px;
+		margin-right: 30px;
+	}
+	
+	.table_box {
+		margin: 30px 20px 10px;
+		text-align: center;
+		font-size: 14px;
+		color: #333333;
+		letter-spacing: 0;
+	}
+	
+	.page_box {
+		margin: 30px 20px 10px;
+	}
+	
+	.el-form-item {
+		width: 420px;
+	}
+	
+	.el-select {
+		width: 285px;
+	}
+	
+	.el-dialog__body {
+		padding: 30px 30px 30px 0;
+	}
+	
+	.el-dialog__footer {
+		padding: 0px 20px 20px;
+		text-align: center;
+	}
+</style>
